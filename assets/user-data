@@ -1,0 +1,43 @@
+#cloud-config
+disable_root: false
+ssh_pwauth: true
+users:
+  - name: root
+    lock-passwd: false
+power_state:
+  mode: poweroff
+  condition: True
+write_files:
+- path: /etc/systemd/system/mount-sources.service
+  content: |
+    [Unit]
+    Description=Mount shared sources
+    DefaultDependencies=no
+    After=systemd-remount-fs.service network-online.target
+    Before=umount.target
+    Conflicts=umount.target
+    RefuseManualStop=true
+    [Install]
+    WantedBy=multi-user.target
+    [Service]
+    Type=oneshot
+    RemainAfterExit=yes
+    ExecStart=mount -t virtiofs sources /mnt
+    ExecStopPost=sh -c 'if mountpoint -q /mnt; then umount -l /mnt; fi'
+runcmd:
+  - [ perl, -i, -pe, s/#PermitRootLogin .*/PermitRootLogin yes/, /etc/ssh/sshd_config ]
+  - [ perl, -i, -pe, s/#PermitEmptyPasswords .*/PermitEmptyPasswords yes/, /etc/ssh/sshd_config ]
+  - [ passwd, -d, root ]
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, enable, mount-sources.service ]
+{{- if commands -}}
+{{ for command in commands }}
+  - [ {{ for arg in command }}{arg}{{ if not @last }}, {{ endif }}{{ endfor }} ]
+{{- endfor }}
+{{- endif }}
+{{ if packages -}}
+package_upgrade: true
+packages:{{ for package in packages }}
+  - { package }
+{{- endfor }}
+{{- endif }}

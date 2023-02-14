@@ -1,0 +1,19 @@
+[package]
+name = "run-kernel"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+
+[dependencies]
+clap = { version = "4", features = ["derive"]}
+anyhow = "1"
+serde = {version = "1", features = ["derive"]}
+toml = "0.7.2"
+reqwest = { version = "0.11.14", features = ["stream"]}
+tokio = { version = "1.25", features = ["fs", "rt"]}
+futures-util = "0.3.26"
+tinytemplate = "1"
+mktemp = "0.5.0"
+shell-words = "1"
+indicatif = "0.17.3"
+config-manager = "0.1.0"
