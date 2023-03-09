@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use crate::{
-    command::{self, CheckExitCode, Command},
+    command::{self, Command},
     config::{self, RunConfig},
 };
 use anyhow::{anyhow, Context, Result};
