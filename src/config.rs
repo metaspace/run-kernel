@@ -68,6 +68,9 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default = 4)]
     pub(crate) memory_gib: u32,
 
+    #[source(clap, config, default = "None")]
+    pub(crate) kernel_extra_args: Option<String>,
+
     #[source(clap, config, default)]
     pub(crate) qemu_args_extra: Vec<String>,
 

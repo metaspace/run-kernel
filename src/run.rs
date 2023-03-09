@@ -174,7 +174,14 @@ fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
             args.push("-kernel".into());
             args.push(config.kernel.clone());
             args.push("-append".into());
-            args.push("console=ttyS0 nokaslr rdinit=/sbin/init root=/dev/vda1".into());
+
+            let mut kernel_args =
+                String::from("console=ttyS0 nokaslr rdinit=/sbin/init root=/dev/vda1");
+            if let Some(args) = &config.kernel_extra_args {
+                kernel_args += " ";
+                kernel_args += &args;
+            }
+            args.push(kernel_args);
         }
         config::Boot::Native => {}
     }
