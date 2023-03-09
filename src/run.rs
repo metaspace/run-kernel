@@ -36,7 +36,20 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
         vm_ssh_shutdown(config).context("Failed to shut down VM via ssh")?;
     }
 
-    qemu.wait()?;
+    {
+        let mut ok = false;
+        for _ in 0..10 {
+            if let Some(_) = qemu.try_wait()? {
+                ok = true;
+                break;
+            }
+            sleep(Duration::from_millis(500));
+        }
+        if !ok {
+            print!("Qemu did not shut down, killing it");
+            qemu.kill()?;
+        }
+    }
 
     println!("qemu terminated");
 
