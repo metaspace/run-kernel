@@ -109,7 +109,8 @@ fn ping_vm_ssh(config: &RunConfig) -> Result<()> {
 fn vm_ssh_shutdown(config: &RunConfig) -> Result<()> {
     let mut command = vm_ssh_cmd(config)?;
     command.arg("poweroff");
-    command.spawn()?.wait()?.check_status()?;
+    // ssh will return nonzero exit status when connection is dropped
+    command.spawn()?.wait()?;
     Ok(())
 }
 
