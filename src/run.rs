@@ -32,8 +32,8 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
 
     if config.ssh {
         let mut command = vm_ssh_cmd(config)?;
-        command.spawn()?.wait()?.check_status()?;
-        vm_ssh_shutdown(config)?;
+        command.spawn()?.wait()?;
+        vm_ssh_shutdown(config).context("Failed to shut down VM via ssh")?;
     }
 
     qemu.wait()?;
