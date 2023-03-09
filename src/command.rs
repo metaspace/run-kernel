@@ -4,6 +4,8 @@ use anyhow::{anyhow, Result};
 use shell_words::split;
 use std::process;
 
+use crate::config::RunConfig;
+
 pub(crate) struct Command {
     command: process::Command,
 }
@@ -49,14 +51,18 @@ impl std::ops::DerefMut for Command {
     }
 }
 
-pub(crate) fn qemu_base_args() -> Result<Vec<String>> {
+pub(crate) fn qemu_base_args(config: &RunConfig) -> Result<Vec<String>> {
     let mut args = Vec::new();
     args.append(&mut split(
-        "-nographic \
-         -enable-kvm \
-         -m 4G \
-         -cpu host \
-         -M q35",
+        format!(
+            "-nographic \
+             -enable-kvm \
+             -m {}G \
+             -cpu host \
+             -M q35",
+            config.memory_gib
+        )
+        .as_str(),
     )?);
     Ok(args)
 }

@@ -65,6 +65,9 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default = "String::from(\"qemu-system-x86_64\")")]
     pub(crate) qemu: String,
 
+    #[source(clap, config, default = 4)]
+    pub(crate) memory_gib: u32,
+
     #[source(clap, config, default)]
     pub(crate) qemu_args_extra: Vec<String>,
 

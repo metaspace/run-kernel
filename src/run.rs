@@ -128,7 +128,7 @@ fn vm_ssh_shutdown(config: &RunConfig) -> Result<()> {
 }
 
 fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
-    let mut args = command::qemu_base_args()?;
+    let mut args = command::qemu_base_args(config)?;
     args.append(&mut split(
         "-name \
         kernel-test,debug-threads=on \
@@ -155,9 +155,9 @@ fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
         args.append(&mut split(&format!(
             "-chardev socket,id=virtiofs0,path='{}' \
              -device vhost-user-fs-pci,queue-size=1024,chardev=virtiofs0,tag=sources \
-             -object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on \
+             -object memory-backend-file,id=mem,size={}G,mem-path=/dev/shm,share=on \
              -numa node,memdev=mem",
-            config.virtiofsd_socket
+            config.virtiofsd_socket, config.memory_gib
         ))?);
     }
 
