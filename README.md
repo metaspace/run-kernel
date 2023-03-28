@@ -35,6 +35,7 @@ run-kernel --ssh=true --share=true
  - qemu-img
  - mkisofs
  - podman (for `unshare` subcommand)
+ - uidmap
 
 # License
 
