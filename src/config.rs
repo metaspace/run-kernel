@@ -59,6 +59,9 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default)]
     pub(crate) ssh: bool,
 
+    #[source(clap, config, default = "None")]
+    pub(crate) ssh_command: Option<String>,
+
     #[source(clap, config, default)]
     pub(crate) boot: Boot,
 

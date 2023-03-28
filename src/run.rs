@@ -32,6 +32,9 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
 
     if config.ssh {
         let mut command = vm_ssh_cmd(config)?;
+        if let Some(ssh_command) = &config.ssh_command {
+            command.arg(ssh_command);
+        }
         command.spawn()?.wait()?;
         vm_ssh_shutdown(config).context("Failed to shut down VM via ssh")?;
     }
