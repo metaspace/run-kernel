@@ -80,7 +80,7 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default = "String::from(\"vm-image/vm.qcow2\")")]
     pub(crate) image: String,
 
-    #[source(clap, config, default = "String::from(\"virtiofsd\")")]
+    #[source(clap, config, default = "String::from(\"/usr/lib/virtiofsd\")")]
     pub(crate) virtiofsd: String,
 
     #[source(clap, config, default = "String::from(\"/tmp/vhostqemu\")")]
