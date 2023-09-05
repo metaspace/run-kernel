@@ -99,7 +99,7 @@ pub(crate) struct BringupConfig {
     #[source(
         clap(long = "seed-image-url"),
         config,
-        default = "String::from(\"https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-genericcloud-amd64.qcow2\")"
+        default = "String::from(\"https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2\")"
     )]
     pub(crate) seed_image_url: String,
 
