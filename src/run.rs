@@ -191,7 +191,7 @@ fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
 
     // TODO: Remote
 
-    args.append(&mut config.qemu_args_extra.clone());
+    args.append(&mut config.qemu_extra_args.clone());
 
     Ok(args.into())
 }

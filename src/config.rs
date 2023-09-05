@@ -75,7 +75,7 @@ pub(crate) struct RunConfig {
     pub(crate) kernel_extra_args: Option<String>,
 
     #[source(clap, config, default)]
-    pub(crate) qemu_args_extra: Vec<String>,
+    pub(crate) qemu_extra_args: Vec<String>,
 
     #[source(clap, config, default = "String::from(\"vm-image/vm.qcow2\")")]
     pub(crate) image: String,
