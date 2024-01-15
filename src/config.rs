@@ -35,14 +35,21 @@ pub(crate) struct Config {
     pub(crate) bringup_config: BringupConfig,
 }
 
+#[derive(Deserialize, Default, Debug, PartialEq)]
+#[serde(rename_all="lowercase")]
+pub(crate) enum Serial {
+    #[default]
+    Disconnected,
+    StdIO,
+    Telnet,
+    Log,
+}
+
 #[derive(Deserialize, Flatten, Debug)]
 #[table = "run"]
 pub(crate) struct RunConfig {
     #[source(clap, config, default)]
     pub(crate) debug: bool,
-
-    #[source(clap, config, default)]
-    pub(crate) log: bool,
 
     #[source(clap, config, default = 2)]
     pub(crate) smp: u32,
@@ -54,7 +61,7 @@ pub(crate) struct RunConfig {
     pub(crate) share: bool,
 
     #[source(clap, config, default)]
-    pub(crate) stdin: bool,
+    pub(crate) serial: Serial,
 
     #[source(clap, config, default)]
     pub(crate) ssh: bool,

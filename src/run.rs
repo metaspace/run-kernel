@@ -2,7 +2,7 @@
 
 use crate::{
     command::{self, Command},
-    config::{self, RunConfig},
+    config::{self, RunConfig, Serial},
 };
 use anyhow::{anyhow, Context, Result};
 use shell_words::split;
@@ -19,7 +19,7 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
 
     let mut qemu = qemu_cmd(config)?.spawn().context("Failed to start qemu")?;
 
-    if config.stdin {
+    if config.serial == Serial::StdIO {
         qemu.wait()?;
         return Ok(());
     }
@@ -144,14 +144,16 @@ fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
         args.append(&mut split("-s -S")?);
     }
 
-    if config.log {
-        args.append(&mut split(
-            "-chardev stdio,id=char0,mux=on,logfile=console.log \
-             -mon chardev=char0 \
-             -serial chardev:char0",
-        )?);
-    } else {
-        args.append(&mut split("-serial mon:stdio")?);
+    match config.serial {
+        Serial::Telnet => args.append(&mut split("-serial telnet:localhost:4000,server")?),
+        Serial::Log => {
+            args.append(&mut split(
+                "-chardev stdio,id=char0,mux=on,logfile=console.log \
+                 -mon chardev=char0 \
+                 -serial chardev:char0",
+            )?);
+        }
+        Serial::Disconnected | Serial::StdIO => args.append(&mut split("-serial mon:stdio")?),
     }
 
     if config.share {
@@ -199,7 +201,7 @@ fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
 fn qemu_cmd(config: &RunConfig) -> Result<Command> {
     let mut command = Command::new(&config.qemu);
     command.args(qemu_args(config)?);
-    if !config.stdin {
+    if config.serial != Serial::StdIO {
         command.stdin(Stdio::null());
     }
     Ok(command)
