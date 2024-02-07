@@ -70,6 +70,9 @@ pub(crate) struct RunConfig {
     pub(crate) ssh_command: Option<String>,
 
     #[source(clap, config, default)]
+    pub(crate) ping_ssh: bool,
+
+    #[source(clap, config, default)]
     pub(crate) boot: Boot,
 
     #[source(clap, config, default = "String::from(\"qemu-system-x86_64\")")]

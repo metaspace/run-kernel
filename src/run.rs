@@ -25,9 +25,11 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
     }
 
     // TODO: kill with drop guard
-    if let Err(e) = ping_vm_ssh(config) {
-        qemu.kill()?;
-        return Err(e);
+    if config.ping_ssh || config.ssh {
+        if let Err(e) = ping_vm_ssh(config) {
+            qemu.kill()?;
+            return Err(e);
+        }
     }
 
     if config.ssh {
@@ -37,6 +39,9 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
         }
         command.spawn()?.wait()?;
         vm_ssh_shutdown(config).context("Failed to shut down VM via ssh")?;
+    } else {
+        qemu.wait()?;
+        return Ok(());
     }
 
     {
