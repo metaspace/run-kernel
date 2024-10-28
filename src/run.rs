@@ -5,7 +5,6 @@ use crate::{
     config::{self, RunConfig, Serial},
 };
 use anyhow::{anyhow, Context, Result};
-use shell_words::split;
 use std::{process::Stdio, thread::sleep, time::Duration};
 
 pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
@@ -33,7 +32,7 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
     }
 
     if config.ssh {
-        let mut command = vm_ssh_cmd(config)?;
+        let mut command = vm_ssh_cmd(config);
         if let Some(ssh_command) = &config.ssh_command {
             command.arg(ssh_command);
         }
@@ -47,7 +46,7 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
     {
         let mut ok = false;
         for _ in 0..10 {
-            if let Some(_) = qemu.try_wait()? {
+            if qemu.try_wait()?.is_some() {
                 ok = true;
                 break;
             }
@@ -72,23 +71,24 @@ pub(crate) fn run_kernel(config: &RunConfig) -> Result<()> {
 fn virtiofsd_cmd(config: &RunConfig) -> Result<Command> {
     use std::env;
 
+    let cwd = env::current_dir()?;
+
     let mut command = Command::new("podman");
-    command.args(vec![
-        "unshare",
-        "--",
-        &config.virtiofsd,
-        format!("--socket-path={}", config.virtiofsd_socket).as_str(),
-        format!("--shared-dir={}", env::current_dir()?.to_string_lossy()).as_str(),
-        "--sandbox=none",
-    ]);
+    command
+        .args(["unshare", "--", &config.virtiofsd])
+        .arg("--socket-path")
+        .arg(&config.virtiofsd_socket)
+        .arg("--shared-dir")
+        .arg(cwd)
+        .arg("--sandbox=none");
 
     Ok(command)
 }
 
-fn vm_ssh_cmd(_config: &RunConfig) -> Result<Command> {
+fn vm_ssh_cmd(_config: &RunConfig) -> Command {
     let mut command = Command::new("ssh");
 
-    command.args(vec![
+    command.args([
         "-l",
         "root",
         "-p",
@@ -100,13 +100,13 @@ fn vm_ssh_cmd(_config: &RunConfig) -> Result<Command> {
         "localhost",
     ]);
 
-    Ok(command)
+    command
 }
 
 fn ping_vm_ssh(config: &RunConfig) -> Result<()> {
     let mut ping_ok = false;
     for _ in 0..10 {
-        let mut command = vm_ssh_cmd(&config)?;
+        let mut command = vm_ssh_cmd(config);
         command.arg("true");
         let exit_code = command
             .spawn()?
@@ -128,62 +128,69 @@ fn ping_vm_ssh(config: &RunConfig) -> Result<()> {
 }
 
 fn vm_ssh_shutdown(config: &RunConfig) -> Result<()> {
-    let mut command = vm_ssh_cmd(config)?;
+    let mut command = vm_ssh_cmd(config);
     command.arg("poweroff");
     // ssh will return nonzero exit status when connection is dropped
     command.spawn()?.wait()?;
     Ok(())
 }
 
-fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
-    let mut args = command::qemu_base_args(config);
-    args.append(&mut split(
-        "-name \
-        kernel-test,debug-threads=on \
-        -nic user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:10022-:22",
-    )?);
-
-    args.append(&mut split(&format!("-smp {}", config.smp))?);
+fn qemu_args<'a>(command: &'a mut Command, config: &RunConfig) -> &'a mut Command {
+    command::qemu_base_args(command, config).args([
+        "-name",
+        "kernel-test,debug-threads=on",
+        "-nic",
+        "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:10022-:22",
+        "-smp",
+    ]);
+    command.arg(format!("{}", config.smp));
 
     if config.debug {
-        args.append(&mut split("-s -S")?);
+        command.args(["-s", "-S"]);
     }
 
     match config.serial {
-        Serial::Telnet => args.append(&mut split("-serial telnet:localhost:4000,server")?),
-        Serial::Log => {
-            args.append(&mut split(
-                "-chardev stdio,id=char0,mux=on,logfile=console.log \
-                 -mon chardev=char0 \
-                 -serial chardev:char0",
-            )?);
-        }
-        Serial::Disconnected | Serial::StdIO => args.append(&mut split("-serial mon:stdio")?),
-    }
+        Serial::Telnet => command.args(["-serial", "telnet:localhost:4000,server"]),
+        Serial::Log => command.args([
+            "-chardev",
+            "stdio,id=char0,mux=on,logfile=console.log",
+            "-mon",
+            "chardev=char0",
+            "-serial",
+            "chardev:char0",
+        ]),
+        Serial::Disconnected | Serial::StdIO => command.args(["-serial", "mon:stdio"]),
+    };
 
     if config.share {
-        args.append(&mut split(&format!(
-            "-chardev socket,id=virtiofs0,path='{}' \
-             -device vhost-user-fs-pci,queue-size=1024,chardev=virtiofs0,tag=sources \
-             -object memory-backend-file,id=mem,size={}G,mem-path=/dev/shm,share=on \
-             -numa node,memdev=mem",
-            config.virtiofsd_socket, config.memory_gib
-        ))?);
+        command
+            .arg("-chardev")
+            .arg(format!(
+                "socket,id=virtiofs0,path={}",
+                config.virtiofsd_socket
+            ))
+            .args([
+                "-device",
+                "vhost-user-fs-pci,queue-size=1024,chardev=virtiofs0,tag=sources",
+            ])
+            .arg("-object")
+            .arg(format!(
+                "memory-backend-file,id=mem,size={}G,mem-path=/dev/shm,share=on",
+                config.memory_gib
+            ))
+            .args(["-numa", "node,memdev=mem"]);
     }
 
     //let mut root_port = 3;
     // TODO: drives
 
-    args.append(&mut split(&format!(
-        "-drive file='{}',if=virtio,format=qcow2",
-        config.image,
-    ))?);
+    command
+        .arg("-drive")
+        .arg(format!("file={},if=virtio,format=qcow2", config.image));
 
     match config.boot {
         config::Boot::Direct => {
-            args.push("-kernel".into());
-            args.push(config.kernel.clone());
-            args.push("-append".into());
+            command.args(["-kernel", &config.kernel, "-append"]);
 
             let console = if cfg!(target_arch = "aarch64") {
                 "ttyAMA0"
@@ -193,24 +200,23 @@ fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
             let mut kernel_args =
                 format!("console={console} nokaslr rdinit=/sbin/init root=/dev/vda1");
             if let Some(args) = &config.kernel_extra_args {
-                kernel_args += " ";
-                kernel_args += &args;
+                kernel_args.push(' ');
+                kernel_args.push_str(args);
             }
-            args.push(kernel_args);
+            command.arg(kernel_args);
         }
         config::Boot::Native => {}
     }
 
     // TODO: Remote
 
-    args.append(&mut config.qemu_extra_args.clone());
-
-    Ok(args.into())
+    command.args(&config.qemu_extra_args);
+    command
 }
 
 fn qemu_cmd(config: &RunConfig) -> Result<Command> {
     let mut command = Command::new(&config.qemu);
-    command.args(qemu_args(config)?);
+    qemu_args(&mut command, config);
     if config.serial != Serial::StdIO {
         command.stdin(Stdio::null());
     }
