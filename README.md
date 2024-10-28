@@ -23,7 +23,7 @@ directory with VM via `virtiofs`:
 ```shell
 mkdir vm-image
 run-kernel --print-config=true
-run-kernel --bringup
+run-kernel --bringup=true
 run-kernel --ssh=true --share=true
 ```
 
@@ -33,7 +33,7 @@ run-kernel --ssh=true --share=true
  - virtiofsd
  - qemu
  - qemu-img
- - mkisofs
+ - mkisofs (`brew install dvdrtools` on macOS)
  - podman (for `unshare` subcommand)
  - uidmap
 
