@@ -5,7 +5,7 @@ use crate::{
     config::{BringupConfig, Config},
 };
 use anyhow::{anyhow, Context, Result};
-use futures_util::StreamExt;
+use futures::StreamExt;
 use mktemp::Temp;
 use shell_words::split;
 use std::{
