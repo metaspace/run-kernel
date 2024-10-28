@@ -75,7 +75,7 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default)]
     pub(crate) boot: Boot,
 
-    #[source(clap, config, default = "String::from(\"qemu-system-x86_64\")")]
+    #[source(clap, config, default = "format!(\"qemu-system-{}\", std::env::consts::ARCH)")]
     pub(crate) qemu: String,
 
     #[source(clap, config, default = 4)]

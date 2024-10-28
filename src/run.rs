@@ -136,7 +136,7 @@ fn vm_ssh_shutdown(config: &RunConfig) -> Result<()> {
 }
 
 fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
-    let mut args = command::qemu_base_args(config)?;
+    let mut args = command::qemu_base_args(config);
     args.append(&mut split(
         "-name \
         kernel-test,debug-threads=on \
@@ -185,8 +185,13 @@ fn qemu_args(config: &RunConfig) -> Result<Vec<String>> {
             args.push(config.kernel.clone());
             args.push("-append".into());
 
+            let console = if cfg!(target_arch = "aarch64") {
+                "ttyAMA0"
+            } else {
+                "ttyS0"
+            };
             let mut kernel_args =
-                String::from("console=ttyS0 nokaslr rdinit=/sbin/init root=/dev/vda1");
+                format!("console={console} nokaslr rdinit=/sbin/init root=/dev/vda1");
             if let Some(args) = &config.kernel_extra_args {
                 kernel_args += " ";
                 kernel_args += &args;

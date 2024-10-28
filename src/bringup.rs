@@ -141,7 +141,7 @@ fn qemu_img_cmd(config: &Config) -> Result<Command> {
 }
 
 fn qemu_init_command(config: &Config, meta_image_path: &Path) -> Result<Command> {
-    let mut args = command::qemu_base_args(&config.run_config)?;
+    let mut args = command::qemu_base_args(&config.run_config);
     args.append(&mut split(&format!(
         "-smp 2 \
          -serial mon:stdio \
