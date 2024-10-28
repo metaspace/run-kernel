@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use anyhow::{anyhow, Result};
-use shell_words::split;
 use std::process;
 
 use crate::config::RunConfig;
@@ -51,18 +50,18 @@ impl std::ops::DerefMut for Command {
     }
 }
 
-pub(crate) fn qemu_base_args(config: &RunConfig) -> Result<Vec<String>> {
-    let mut args = Vec::new();
-    args.append(&mut split(
-        format!(
-            "-nographic \
-             -enable-kvm \
-             -m {}G \
-             -cpu host \
-             -M q35",
-            config.memory_gib
-        )
-        .as_str(),
-    )?);
-    Ok(args)
+pub(crate) fn qemu_base_args(config: &RunConfig) -> Vec<String> {
+    let args = ["-nographic", "-cpu", "host"].into_iter();
+    #[cfg(target_os = "linux")]
+    let args = args.chain(["-accel", "kvm"].into_iter());
+    #[cfg(target_os = "macos")]
+    let args = args.chain(["-accel", "hvf"].into_iter());
+
+    #[cfg(target_arch = "aarch64")]
+    let args = args.chain(["-machine", "virt"].into_iter());
+
+    args.chain(std::iter::once("-m"))
+        .map(ToOwned::to_owned)
+        .chain(std::iter::once(format!("{}G", config.memory_gib)))
+        .collect()
 }
