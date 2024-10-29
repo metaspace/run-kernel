@@ -94,7 +94,25 @@ fn generate_meta(config: &BringupConfig) -> Result<(Temp, PathBuf)> {
 
 pub(crate) fn bring_up(config: &Config) -> Result<()> {
     get_seed_image(config)?;
-    qemu_img_cmd(config)?.spawn()?.wait()?.check_status()?;
+    qemu_img_cmd(
+        &config.run_config.image,
+        config.bringup_config.image_size,
+        Some(&config.bringup_config.seed_image_path),
+    )?
+    .spawn()?
+    .wait()?
+    .check_status()?;
+
+    #[cfg(target_arch = "aarch64")]
+    qemu_img_cmd(
+        &config.run_config.qemu_varstore_image_path,
+        byte_unit::Byte::from_u64_with_unit(64, byte_unit::Unit::MiB).unwrap(),
+        None::<&str>,
+    )?
+    .spawn()?
+    .wait()?
+    .check_status()?;
+
     let (_dir, image_path) = generate_meta(&config.bringup_config)?;
     let mut command = qemu_init_command(config, &image_path);
     command.spawn()?.wait()?.check_status()?;
@@ -116,20 +134,25 @@ fn joliet_cmd(
     Ok(command)
 }
 
-fn qemu_img_cmd(config: &Config) -> Result<Command> {
+fn qemu_img_cmd(
+    path: impl AsRef<str>,
+    size: byte_unit::Byte,
+    backing_path: Option<impl AsRef<str>>,
+) -> Result<Command> {
     let mut command = Command::new("qemu-img");
-    let backing_file = std::path::PathBuf::from(&config.bringup_config.seed_image_path);
-    let backing_file = backing_file.canonicalize()?;
+
+    command.args(["create", "-f", "qcow2"]);
+    if let Some(backing_path) = backing_path {
+        let backing_path = PathBuf::from(backing_path.as_ref()).canonicalize()?;
+        command.args(["-b", &backing_path.to_string_lossy(), "-F", "qcow2"]);
+    }
+
     command.args([
-        "create",
-        "-f",
-        "qcow2",
-        "-b",
-        &backing_file.to_string_lossy(),
-        "-F",
-        "qcow2",
-        &config.run_config.image,
-        &format!("{}G", config.bringup_config.image_size_gb),
+        path.as_ref(),
+        &format!(
+            "{}M",
+            size.get_adjusted_unit(byte_unit::Unit::MiB).get_value()
+        ),
     ]);
 
     Ok(command)
@@ -138,6 +161,25 @@ fn qemu_img_cmd(config: &Config) -> Result<Command> {
 fn qemu_init_command(config: &Config, meta_image_path: &Path) -> Command {
     let mut command = Command::new(&config.run_config.qemu);
     command::qemu_base_args(&mut command, &config.run_config);
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        command.args([
+            "-drive",
+            &format!(
+                "if=pflash,format=raw,file={file}",
+                file = config.run_config.qemu_efi_image_path
+            ),
+        ]);
+        command.args([
+            "-drive",
+            &format!(
+                "if=pflash,file={file}",
+                file = config.run_config.qemu_varstore_image_path
+            ),
+        ]);
+    }
+
     command
         .args(["-smp", "2"])
         .args(["-serial", "mon:stdio", "-nic", "user,model=virtio-net-pci"])

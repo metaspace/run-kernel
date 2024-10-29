@@ -205,7 +205,26 @@ fn qemu_args<'a>(command: &'a mut Command, config: &RunConfig) -> &'a mut Comman
             }
             command.arg(kernel_args);
         }
-        config::Boot::Native => {}
+        config::Boot::Native => {
+            #[cfg(target_arch = "aarch64")]
+            {
+                // TODO: duplicated in bringup code
+                command.args([
+                    "-drive",
+                    &format!(
+                        "if=pflash,format=raw,file={file}",
+                        file = config.qemu_efi_image_path
+                    ),
+                ]);
+                command.args([
+                    "-drive",
+                    &format!(
+                        "if=pflash,file={file}",
+                        file = config.qemu_varstore_image_path
+                    ),
+                ]);
+            }
+        }
     }
 
     // TODO: Remote

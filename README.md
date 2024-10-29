@@ -27,6 +27,12 @@ run-kernel --bringup=true
 run-kernel --ssh=true --share=true
 ```
 
+## macOS Specific Details
+
+`qemu` on arm64 needs EFI firmware to boot upstream Debian images. You have to
+provide this firmware to `run-kernel` so that `qemu` can find it. Pass
+`--qemu-efi-image-path=<path>` to `run-kernel` to supply this information.
+
 # Requirements
 
  - cargo

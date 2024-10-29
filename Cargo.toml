@@ -17,3 +17,4 @@ indicatif = "0.17.3"
 config-manager = "0.2.0"
 openssl-sys = { version = "0.9.80", features = ["vendored"]}
 static_assertions = "1.1.0"
+byte-unit = { version = "5.1.4", features = ["serde"] }

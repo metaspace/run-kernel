@@ -35,7 +35,7 @@ pub(crate) struct Config {
 }
 
 #[derive(Deserialize, Default, Debug, PartialEq)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all = "lowercase")]
 pub(crate) enum Serial {
     #[default]
     Disconnected,
@@ -74,7 +74,11 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default)]
     pub(crate) boot: Boot,
 
-    #[source(clap, config, default = "format!(\"qemu-system-{}\", std::env::consts::ARCH)")]
+    #[source(
+        clap,
+        config,
+        default = "format!(\"qemu-system-{}\", std::env::consts::ARCH)"
+    )]
     pub(crate) qemu: String,
 
     #[source(clap, config, default = 4)]
@@ -94,6 +98,18 @@ pub(crate) struct RunConfig {
 
     #[source(clap, config, default = "String::from(\"/tmp/vhostqemu\")")]
     pub(crate) virtiofsd_socket: String,
+
+    #[cfg(target_arch = "aarch64")]
+    #[source(clap(long = "qemu-efi-image-path"), config)]
+    pub(crate) qemu_efi_image_path: String,
+
+    #[cfg(target_arch = "aarch64")]
+    #[source(
+        clap(long = "qemu-varstore-image-path"),
+        config,
+        default = "String::from(\"vm-image/varstore.qcow2\")"
+    )]
+    pub(crate) qemu_varstore_image_path: String,
 }
 
 #[derive(Serialize, Deserialize, Flatten, Clone, Debug)]
@@ -128,8 +144,12 @@ pub(crate) struct BringupConfig {
     )]
     pub(crate) seed_image_path: String,
 
-    #[source(clap(long = "image-size-gb"), config, default = 50)]
-    pub(crate) image_size_gb: u32,
+    #[source(
+        clap(long = "image-size-gb"),
+        config,
+        default = "byte_unit::Byte::from_u64_with_unit(50, byte_unit::Unit::GiB).unwrap()"
+    )]
+    pub(crate) image_size: byte_unit::Byte,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
