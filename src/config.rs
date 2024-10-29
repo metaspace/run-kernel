@@ -113,6 +113,14 @@ pub(crate) struct BringupConfig {
     )]
     pub(crate) seed_image_url: String,
 
+    #[cfg(target_arch = "aarch64")]
+    #[source(
+        clap(long = "seed-image-url"),
+        config,
+        default = "String::from(\"https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-arm64.qcow2\")"
+    )]
+    pub(crate) seed_image_url: String,
+
     #[source(
         clap(long = "seed-image-path"),
         config,
