@@ -4,10 +4,9 @@ use crate::{
     command::{self, CheckExitCode, Command},
     config::{BringupConfig, Config},
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use futures::StreamExt;
 use mktemp::Temp;
-use shell_words::split;
 use std::{
     fs::File,
     io::Write,
@@ -81,13 +80,12 @@ fn generate_meta(config: &BringupConfig) -> Result<(Temp, PathBuf)> {
     let mut image_path = PathBuf::from(image_tmpdir.as_path());
     image_path.push("init.img");
 
-    let files = vec![user_data_file_path, meta_data_file_path];
     let mut cmd = joliet_cmd(
-        &files.iter().map(|f| f.as_path()).collect(),
+        [user_data_file_path, meta_data_file_path].into_iter(),
         image_path.as_path(),
     )?;
 
-    let _status = cmd.spawn()?.wait()?.check_status()?;
+    cmd.spawn()?.wait()?.check_status()?;
 
     Ok((image_tmpdir, image_path))
 }
@@ -96,27 +94,22 @@ pub(crate) fn bring_up(config: &Config) -> Result<()> {
     get_seed_image(config)?;
     qemu_img_cmd(config)?.spawn()?.wait()?.check_status()?;
     let (_dir, image_path) = generate_meta(&config.bringup_config)?;
-    let mut command = qemu_init_command(config, &image_path)?;
+    let mut command = qemu_init_command(config, &image_path);
     command.spawn()?.wait()?.check_status()?;
     Ok(())
 }
 
-fn joliet_cmd(input_files: &Vec<&Path>, output_path: &Path) -> Result<Command> {
+fn joliet_cmd(
+    input_files: impl Iterator<Item = impl AsRef<std::ffi::OsStr>>,
+    output_path: &Path,
+) -> Result<Command> {
     let mut command = Command::new("mkisofs");
 
-    command.args(vec![
-        "-output",
-        output_path
-            .as_os_str()
-            .to_str()
-            .ok_or(anyhow!("Failed to convert path"))?,
-        "-volid",
-        "cidata",
-        "-joliet",
-        "-rock",
-    ]);
-
-    command.args(input_files.iter().map(|f| f.to_str().unwrap()));
+    command
+        .arg("-output")
+        .arg(output_path)
+        .args(["-volid", "cidata", "-joliet", "-rock"])
+        .args(input_files);
 
     Ok(command)
 }
@@ -125,37 +118,37 @@ fn qemu_img_cmd(config: &Config) -> Result<Command> {
     let mut command = Command::new("qemu-img");
     let backing_file = std::path::PathBuf::from(&config.bringup_config.seed_image_path);
     let backing_file = backing_file.canonicalize()?;
-    command.args(split(&format!(
-        "create \
-         -f qcow2 \
-         -b '{}' \
-         -F qcow2 \
-         '{}' \
-         {}G",
-        backing_file.to_str().unwrap(),
+    command.args([
+        "create",
+        "-f",
+        "qcow2",
+        "-b",
+        &backing_file.to_string_lossy(),
+        "-F",
+        "qcow2",
         &config.run_config.image,
-        config.bringup_config.image_size_gb,
-    ))?);
+        &format!("{}G", config.bringup_config.image_size_gb),
+    ]);
 
     Ok(command)
 }
 
-fn qemu_init_command(config: &Config, meta_image_path: &Path) -> Result<Command> {
-    let mut args = command::qemu_base_args(&config.run_config);
-    args.append(&mut split(&format!(
-        "-smp 2 \
-         -serial mon:stdio \
-         -nic user,model=virtio-net-pci \
-         -drive id=boot,file='{}',format=qcow2,if=virtio,media=disk,read-only=no \
-         -drive id=seed,file={},format=raw,if=virtio,media=disk,read-only=yes",
-        &config.run_config.image,
-        meta_image_path
-            .to_str()
-            .ok_or(anyhow!("Failed to convert path"))?,
-    ))?);
-
+fn qemu_init_command(config: &Config, meta_image_path: &Path) -> Command {
     let mut command = Command::new(&config.run_config.qemu);
-    command.args(args);
-    command.stdin(Stdio::null());
-    Ok(command)
+    command::qemu_base_args(&mut command, &config.run_config);
+    command
+        .args(["-smp", "2"])
+        .args(["-serial", "mon:stdio", "-nic", "user,model=virtio-net-pci"])
+        .arg("-drive")
+        .arg(format!(
+            "id=boot,file={path},format=qcow2,if=virtio,media=disk,read-only=no",
+            path = &config.run_config.image
+        ))
+        .arg("-drive")
+        .args([format!(
+            "id=seed,file={path},format=raw,if=virtio,media=disk,read-only=yes",
+            path = meta_image_path.to_string_lossy()
+        )])
+        .stdin(Stdio::null());
+    command
 }

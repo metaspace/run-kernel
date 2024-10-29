@@ -51,22 +51,28 @@ impl std::ops::DerefMut for Command {
     }
 }
 
-pub(crate) fn qemu_base_args(config: &RunConfig) -> Vec<String> {
-    let args = ["-nographic", "-cpu", "host"].into_iter();
-    #[cfg(target_os = "linux")]
-    let args = args.chain(["-accel", "kvm"].into_iter());
-    #[cfg(target_os = "macos")]
-    let args = args.chain(["-accel", "hvf"].into_iter());
-
-    #[cfg(target_arch = "aarch64")]
-    let args = args.chain(["-machine", "virt"].into_iter());
-    #[cfg(target_arch = "x86_64")]
-    let args = args.chain(["-machine", "q35"].into_iter());
-
+pub(crate) fn qemu_base_args<'a>(command: &'a mut Command, config: &RunConfig) -> &'a mut Command {
     assert_cfg!(any(target_arch = "x86_64", target_arch = "aarch64"));
 
-    args.chain(std::iter::once("-m"))
-        .map(ToOwned::to_owned)
-        .chain(std::iter::once(format!("{}G", config.memory_gib)))
-        .collect()
+    command.args([
+        "-nographic",
+        "-cpu",
+        "host",
+        "-m",
+        &format!("{}G", config.memory_gib),
+    ]);
+
+    if cfg!(target_os = "linux") {
+        command.args(["-accel", "kvm"]);
+    }
+    if cfg!(target_os = "macos") {
+        command.args(["-accel", "hvf"]);
+    }
+    if cfg!(target_arch = "aarch64") {
+        command.args(["-machine", "virt"]);
+    } else if cfg!(target_arch = "x86_64") {
+        command.args(["-machine", "q35"]);
+    }
+
+    command
 }
