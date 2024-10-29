@@ -105,6 +105,7 @@ pub(crate) struct BringupConfig {
     #[source(clap, config, default)]
     pub(crate) commands: Vec<Vec<String>>,
 
+    #[cfg(target_arch = "x86_64")]
     #[source(
         clap(long = "seed-image-url"),
         config,

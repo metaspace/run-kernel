@@ -5,52 +5,54 @@ use crate::{
     config::{BringupConfig, Config},
 };
 use anyhow::{Context, Result};
-use futures::StreamExt;
 use mktemp::Temp;
 use std::{
     fs::File,
-    io::Write,
+    io::{copy, Read, Write as _},
     path::{Path, PathBuf},
     process::Stdio,
 };
-use tokio::io::AsyncWriteExt;
 
-async fn get_seed_image_async(config: &Config) -> Result<()> {
+struct ProgressRead<R: Read> {
+    inner: R,
+    bar: indicatif::ProgressBar,
+}
+
+impl<R: Read> Read for ProgressRead<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let Self { inner, bar } = self;
+        let n = inner.read(buf)?;
+        bar.inc(n as u64);
+        Ok(n)
+    }
+}
+
+fn get_seed_image(config: &Config) -> Result<()> {
+    let mut out = match File::create_new(&config.bringup_config.seed_image_path) {
+        Ok(out) => out,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                println!("Skipping seed image download: file exists");
+                return Ok(());
+            } else {
+                return Err(e).context("Failed to create seed image file");
+            }
+        }
+    };
     println!(
         "Downloading seed image {} to {}",
         &config.bringup_config.seed_image_url, &config.bringup_config.seed_image_path
     );
-    let mut file = tokio::fs::File::create(&config.bringup_config.seed_image_path)
-        .await
-        .context("Failed to create seed image file")?;
-    let request = reqwest::get(&config.bringup_config.seed_image_url).await?;
-
-    let bar = match request.content_length() {
+    let resp = reqwest::blocking::get(&config.bringup_config.seed_image_url)?;
+    let bar = match resp.content_length() {
         Some(length) => indicatif::ProgressBar::new(length),
         None => indicatif::ProgressBar::new_spinner(),
     };
+    let _: u64 =
+        copy(&mut ProgressRead { inner: resp, bar }, &mut out).context("failed to copy content")?;
 
-    let mut stream = request.bytes_stream();
-    while let Some(data) = stream.next().await {
-        let data = data?;
-        file.write_all(&data).await?;
-        bar.inc(data.len() as u64);
-    }
+    // TODO: Download checksum and verify image
     Ok(())
-}
-
-fn get_seed_image(config: &Config) -> Result<()> {
-    if std::path::Path::new(&config.bringup_config.seed_image_path).exists() {
-        println!("Skipping seed image download: file exists");
-        return Ok(());
-    }
-
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-
-    // TODO: Download and check signature
-    rt.block_on(get_seed_image_async(config))
 }
 
 fn generate_meta(config: &BringupConfig) -> Result<(Temp, PathBuf)> {
