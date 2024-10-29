@@ -18,3 +18,4 @@ shell-words = "1"
 indicatif = "0.17.3"
 config-manager = "0.2.0"
 openssl-sys = { version = "0.9.80", features = ["vendored"]}
+static_assertions = "1.1.0"

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use anyhow::{anyhow, Result};
+use static_assertions::assert_cfg;
 use std::process;
 
 use crate::config::RunConfig;
@@ -61,6 +62,8 @@ pub(crate) fn qemu_base_args(config: &RunConfig) -> Vec<String> {
     let args = args.chain(["-machine", "virt"].into_iter());
     #[cfg(target_arch = "x86_64")]
     let args = args.chain(["-machine", "q35"].into_iter());
+
+    assert_cfg!(any(target_arch = "x86_64", target_arch = "aarch64"));
 
     args.chain(std::iter::once("-m"))
         .map(ToOwned::to_owned)
