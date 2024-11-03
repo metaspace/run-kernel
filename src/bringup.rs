@@ -27,6 +27,7 @@ impl<R: Read> Read for ProgressRead<R> {
     }
 }
 
+// TODO: Download to tmpfile and move into place when done
 fn get_seed_image(config: &Config) -> Result<()> {
     let mut out = match File::create_new(&config.bringup_config.seed_image_path) {
         Ok(out) => out,
