@@ -184,7 +184,7 @@ fn vm_ssh_shutdown(config: &RunConfig) -> Result<()> {
     Ok(())
 }
 
-fn virtiofs_qemu_args(
+fn qemu_virtiofs_args_one(
     config: &RunConfig,
     tag: &str,
     path: &Path,
@@ -202,12 +202,12 @@ fn virtiofs_qemu_args(
     ])
 }
 
-fn virtiofs_args(config: &RunConfig) -> Result<impl Iterator<Item = impl AsRef<OsStr>>> {
+fn qemu_virtiofs_args_all(config: &RunConfig) -> Result<impl Iterator<Item = impl AsRef<OsStr>>> {
     let mut args = Vec::new();
 
     for (tag, path) in config.shares_iter()? {
         args.extend(
-            virtiofs_qemu_args(config, tag.as_str(), &path)?
+            qemu_virtiofs_args_one(config, tag.as_str(), &path)?
                 .into_iter()
                 .map(|s| s.as_ref().to_owned()),
         );
@@ -255,7 +255,7 @@ fn qemu_args<'a>(
         Serial::Disconnected | Serial::StdIO => command.args(["-serial", "mon:stdio"]),
     };
 
-    command.args(virtiofs_args(config)?);
+    command.args(qemu_virtiofs_args_all(config)?);
     command.arg("-initrd").arg(initrd_path.as_ref());
 
     //let mut root_port = 3;
