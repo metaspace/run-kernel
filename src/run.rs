@@ -6,6 +6,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context};
 use std::{
+    ffi::OsStr,
     io::Write,
     path::{Path, PathBuf},
     process::Stdio,
@@ -201,6 +202,27 @@ fn virtiofs_qemu_args(
     ])
 }
 
+fn virtiofs_args(config: &RunConfig) -> Result<impl Iterator<Item = impl AsRef<OsStr>>> {
+    let mut args = Vec::new();
+
+    for (tag, path) in config.shares_iter()? {
+        args.extend(
+            virtiofs_qemu_args(config, tag.as_str(), &path)?
+                .into_iter()
+                .map(|s| s.as_ref().to_owned()),
+        );
+    }
+
+    args.push("-object".to_owned());
+    args.push(format!(
+        "memory-backend-file,id=mem,size={}G,mem-path=/dev/shm,share=on",
+        config.memory_gib
+    ));
+    args.extend(["-numa".to_owned(), "node,memdev=mem".to_owned()]);
+
+    Ok(args.into_iter())
+}
+
 fn qemu_args<'a>(
     command: &'a mut Command,
     config: &RunConfig,
@@ -233,22 +255,7 @@ fn qemu_args<'a>(
         Serial::Disconnected | Serial::StdIO => command.args(["-serial", "mon:stdio"]),
     };
 
-    for (tag, path) in config.shares_iter()? {
-        command.args(
-            virtiofs_qemu_args(config, tag.as_str(), &path)?
-                .into_iter()
-                .map(|s| s.as_ref().to_owned()),
-        );
-    }
-
-    command
-        .arg("-object")
-        .arg(format!(
-            "memory-backend-file,id=mem,size={}G,mem-path=/dev/shm,share=on",
-            config.memory_gib
-        ))
-        .args(["-numa", "node,memdev=mem"]);
-
+    command.args(virtiofs_args(config)?);
     command.arg("-initrd").arg(initrd_path.as_ref());
 
     //let mut root_port = 3;
@@ -274,8 +281,6 @@ fn qemu_args<'a>(
             command.arg(kernel_args);
         }
     }
-
-    // TODO: Remote
 
     command.args(&config.qemu_extra_args);
     Ok(command)
