@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context};
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 
 type Result<T = ()> = anyhow::Result<T>;
@@ -18,19 +19,48 @@ impl ExitOk for std::process::ExitStatus {
 }
 
 fn main() -> Result {
-    std::process::Command::new("cargo")
-        .current_dir("init")
-        .arg("build")
-        .arg("--release")
-        .spawn()?
-        .wait()?
-        .success()?;
+    let init_path = if let Some(init_path) = std::env::var_os("RUN_KERNEL_INIT_PATH") {
+        PathBuf::from(init_path)
+    } else {
+        std::process::Command::new("cargo")
+            .current_dir("init")
+            .arg("build")
+            .arg("--target=x86_64-unknown-linux-musl")
+            .arg("--release")
+            .spawn()?
+            .wait()?
+            .success()?;
 
-    let mut init_path = PathBuf::from("./init");
-    init_path.push("target");
-    init_path.push("x86_64-unknown-linux-musl");
-    init_path.push("release");
-    init_path.push("init");
+        let output = std::process::Command::new("cargo")
+            .current_dir("init")
+            .arg("metadata")
+            .arg("--format-version=1")
+            .stdout(std::process::Stdio::piped())
+            .spawn()?
+            .wait_with_output()?;
+
+        output.status.success()?;
+
+        let output = output.stdout;
+        let v: Value = serde_json::from_slice(&output)?;
+
+        let Value::Object(map) = v else {
+            return Err(anyhow!("Could not parse cargo metadata"));
+        };
+
+        let Value::String(target_dir) = map
+            .get("target_directory")
+            .ok_or(anyhow!("`target_directory` key missing in metadata"))?
+        else {
+            return Err(anyhow!("Could not parse cargo metadata"));
+        };
+
+        let mut init_path = PathBuf::from(target_dir);
+        init_path.push("x86_64-unknown-linux-musl");
+        init_path.push("release");
+        init_path.push("init");
+        init_path
+    };
 
     let content = std::iter::once((
         cpio::NewcBuilder::new("init")
