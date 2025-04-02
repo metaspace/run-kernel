@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+use std::iter;
+use std::path::PathBuf;
+
+use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
 use config_manager::config;
 use config_manager::ConfigInit;
 use config_manager::Flatten;
 use serde::Deserialize;
-use serde::Serialize;
 
 #[derive(Debug)]
 #[config(file(
@@ -24,18 +27,12 @@ pub(crate) struct Args {
 
 #[derive(Deserialize, Flatten, Debug)]
 pub(crate) struct Config {
-    #[source(clap, default)]
-    pub(crate) bringup: bool,
-
     #[flatten]
     pub(crate) run_config: RunConfig,
-
-    #[flatten]
-    pub(crate) bringup_config: BringupConfig,
 }
 
 #[derive(Deserialize, Default, Debug, PartialEq)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all = "lowercase")]
 pub(crate) enum Serial {
     #[default]
     Disconnected,
@@ -57,7 +54,7 @@ pub(crate) struct RunConfig {
     pub(crate) kernel: String,
 
     #[source(clap, config, default)]
-    pub(crate) share: bool,
+    pub(crate) share: Vec<String>,
 
     #[source(clap, config, default)]
     pub(crate) serial: Serial,
@@ -74,7 +71,11 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default)]
     pub(crate) boot: Boot,
 
-    #[source(clap, config, default = "format!(\"qemu-system-{}\", std::env::consts::ARCH)")]
+    #[source(
+        clap,
+        config,
+        default = "format!(\"qemu-system-{}\", std::env::consts::ARCH)"
+    )]
     pub(crate) qemu: String,
 
     #[source(clap, config, default = 4)]
@@ -86,55 +87,40 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default)]
     pub(crate) qemu_extra_args: Vec<String>,
 
-    #[source(clap, config, default = "String::from(\"vm-image/vm.qcow2\")")]
-    pub(crate) image: String,
-
     #[source(clap, config, default = "String::from(\"/usr/lib/virtiofsd\")")]
     pub(crate) virtiofsd: String,
 
-    #[source(clap, config, default = "String::from(\"/tmp/vhostqemu\")")]
-    pub(crate) virtiofsd_socket: String,
+    #[source(clap, config, default = "String::from(\"/tmp/\")")]
+    pub(crate) virtiofsd_socket_dir: String,
+
+    #[source(clap, config, default = "String::from(\"./nixos\")")]
+    pub(crate) flake: String,
 }
 
-#[derive(Serialize, Deserialize, Flatten, Clone, Debug)]
-#[table = "bringup"]
-pub(crate) struct BringupConfig {
-    #[source(clap, config, default)]
-    pub(crate) packages: Vec<String>,
+fn validate_share(share: impl AsRef<str>) -> Result<(String, PathBuf)> {
+    let expr = regex::Regex::new(r"(^[[:alpha:]]+):(.+)$")?;
+    let capture = expr
+        .captures(share.as_ref())
+        .ok_or(anyhow!("Invalid share path: {}", share.as_ref()))?;
+    let tag = capture.get(1).unwrap();
+    let path = capture.get(2).unwrap();
+    Ok((
+        tag.as_str().to_owned(),
+        PathBuf::from(path.as_str().to_owned()),
+    ))
+}
 
-    #[source(clap, config, default)]
-    pub(crate) commands: Vec<Vec<String>>,
-
-    #[cfg(target_arch = "x86_64")]
-    #[source(
-        clap(long = "seed-image-url"),
-        config,
-        default = "String::from(\"https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2\")"
-    )]
-    pub(crate) seed_image_url: String,
-
-    #[cfg(target_arch = "aarch64")]
-    #[source(
-        clap(long = "seed-image-url"),
-        config,
-        default = "String::from(\"https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-arm64.qcow2\")"
-    )]
-    pub(crate) seed_image_url: String,
-
-    #[source(
-        clap(long = "seed-image-path"),
-        config,
-        default = "String::from(\"vm-image/seed.img\")"
-    )]
-    pub(crate) seed_image_path: String,
-
-    #[source(clap(long = "image-size-gb"), config, default = 50)]
-    pub(crate) image_size_gb: u32,
+impl RunConfig {
+    pub fn shares_iter(&self) -> Result<impl IntoIterator<Item = (String, PathBuf)>> {
+        Ok(iter::once("store:/nix/store")
+            .chain(self.share.iter().map(|s| s.as_ref()))
+            .map(validate_share)
+            .collect::<Result<Vec<_>>>()?)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub(crate) enum Boot {
-    Native,
     Direct,
 }
 

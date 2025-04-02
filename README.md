@@ -23,19 +23,16 @@ directory with VM via `virtiofs`:
 ```shell
 mkdir vm-image
 run-kernel --print-config=true
-run-kernel --bringup=true
-run-kernel --ssh=true --share=true
+run-kernel --ssh=true --share=share:./
 ```
 
 # Requirements
 
  - cargo
  - virtiofsd
+ - cpio
  - qemu
- - qemu-img
- - mkisofs (`brew install dvdrtools` on macOS)
  - podman (for `unshare` subcommand)
- - uidmap
 
 # License
 

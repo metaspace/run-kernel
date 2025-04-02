@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-mod bringup;
 mod command;
 mod config;
 mod run;
@@ -14,10 +13,5 @@ fn main() -> Result<()> {
     }
 
     let config = &args.config;
-
-    if config.bringup {
-        bringup::bring_up(config)
-    } else {
-        run::run_kernel(&config.run_config)
-    }
+    run::run_kernel(&config.run_config)
 }
