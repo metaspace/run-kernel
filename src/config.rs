@@ -11,6 +11,8 @@ use config_manager::ConfigInit;
 use config_manager::Flatten;
 use serde::Deserialize;
 
+// TODO: Consider moving to figment for configuration.
+
 #[derive(Debug)]
 #[config(file(
     format = "toml",
@@ -90,7 +92,7 @@ pub(crate) struct RunConfig {
     #[source(clap, config, default = "String::from(\"/usr/lib/virtiofsd\")")]
     pub(crate) virtiofsd: String,
 
-    #[source(clap, config, default = "String::from(\"/tmp/\")")]
+    #[source(clap, config, default = "String::from(\"/tmp\")")]
     pub(crate) virtiofsd_socket_dir: String,
 
     #[source(clap, config, default = "String::from(\"./nixos\")")]
